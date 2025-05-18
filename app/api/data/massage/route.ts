@@ -22,13 +22,13 @@ export async function GET(): Promise<NextResponse> {
   for (const country of countries) {
     const cities = country.cities;
     for (const city of cities) {
-      const textQuery = `spa in ${city.name}, ${country.name}`;
+      const textQuery = `Massage in ${city.name}, ${country.name}`;
       const body = JSON.stringify({
         textQuery,
         languageCode,
         rankPreference: "RELEVANCE",
         minRating: 3.0,
-        pageSize: 15,
+        pageSize: 18,
       });
 
       try {
@@ -48,7 +48,7 @@ export async function GET(): Promise<NextResponse> {
           return NextResponse.json({ status: response.status, error: errorData });
         }
 
-        const newPlaces = await response.json();        
+        const newPlaces = await response.json();          
 
         if (newPlaces.places) {
           for (const place of newPlaces.places) {
@@ -94,21 +94,21 @@ export async function GET(): Promise<NextResponse> {
               }
 
               const { error: insertError } = await supabase
-                .from("spas")
+                .from("massages_parlors")
                 .insert(formattedPlace)
                 .select();
 
               if (insertError) {
-                console.error("Error inserting spa:", insertError);
+                console.error("Error inserting massage parlor:", insertError);
                 if (insertError.details && insertError.details.includes("(slug)=")) {
                   formattedPlace.name = `${formattedPlace.name} - ${city.name}`;
                   formattedPlace.slug = toSlug(`${formattedPlace.name}-${city.name}`);
                   const { error: insertError3 } = await supabase
-                    .from("spas")
+                    .from("massages_parlors")
                     .insert(formattedPlace);
 
                   if (insertError3) {
-                    console.error("AGAIN Error inserting spa:", insertError3);
+                    console.error("AGAIN Error inserting massage parlor:", insertError3);
                   } 
                 }
               }
