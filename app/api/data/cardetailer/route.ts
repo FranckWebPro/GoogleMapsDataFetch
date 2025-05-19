@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { toSlug } from "@/libs/utils";
-import { camelToTitleCase } from "@/libs/utils";
 
 export async function GET(): Promise<NextResponse> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY!;
@@ -12,7 +11,7 @@ export async function GET(): Promise<NextResponse> {
 
   const { data: countries, error: countryError } = await supabase
     .from("countries")
-    .select("id, name, cities(id, name)").eq("id", 3);
+    .select("id, name, cities(id, name)").eq("id", 6);
 
   if (countryError) {
     console.error("Error fetching country data:", countryError);
@@ -22,7 +21,7 @@ export async function GET(): Promise<NextResponse> {
   for (const country of countries) {
     const cities = country.cities;
     for (const city of cities) {
-      const textQuery = `Car wash in ${city.name}, ${country.name}`;
+      const textQuery = `Car detailer in ${city.name}, ${country.name}`;
       const body = JSON.stringify({
         textQuery,
         languageCode,
@@ -53,16 +52,6 @@ export async function GET(): Promise<NextResponse> {
         if (newPlaces.places) {
           for (const place of newPlaces.places) {
             if (place.id && place.displayName?.text) {
-
-        const paymentOptionsArray: string[] = [];
-        if (place.paymentOptions) {
-        for (const [key, value] of Object.entries(place.paymentOptions)) {
-            if (value === true) {
-            paymentOptionsArray.push(camelToTitleCase(key));
-            }
-        }
-
-        }
               const formattedPlace = {
                 id: place.id,
                 name: place.displayName.text,
@@ -71,17 +60,14 @@ export async function GET(): Promise<NextResponse> {
                 formatted_address: place.formattedAddress,
                 opening_hours: place.currentOpeningHours?.weekdayDescriptions,
                 rating: place.rating,
+                google_maps_uri: place.googleMapsUri,
                 user_rating_count: place.userRatingCount,
                 website_uri: place.websiteUri,
-                google_maps_uri: place.googleMapsUri,
                 description: place.generativeSummary?.overview?.text,
                 types: place.types.filter((type: string) => type !== "point_of_interest" && type !== "establishment").join(", "),
-                accepts_credit_card: place.paymentOptions?.creditCard === true,
-                accepts_nfc: place.paymentOptions?.nfc === true,
+                accepts_credit_card: place.paymentOptions?.creditCard || false,
+                accepts_nfc: place.paymentOptions?.nfc || false,
                 city_id: city.id,
-                status: 'published',
-                display_email: false,
-                do_follow: false
               };
 
               if (!formattedPlace.slug || formattedPlace.slug === "") {
@@ -89,21 +75,21 @@ export async function GET(): Promise<NextResponse> {
               }
 
               const { error: insertError } = await supabase
-                .from("car_washes")
+                .from("car_detailers")
                 .insert(formattedPlace)
                 .select();
 
               if (insertError) {
-                console.error("Error inserting carwash:", insertError);
+                console.error("Error inserting cardetailer:", insertError);
                 if (insertError.details && insertError.details.includes("(slug)=")) {
                   formattedPlace.name = `${formattedPlace.name} - ${city.name}`;
                   formattedPlace.slug = toSlug(`${formattedPlace.name}-${city.name}`);
                   const { error: insertError3 } = await supabase
-                    .from("car_washes")
+                    .from("car_detailers")
                     .insert(formattedPlace);
 
                   if (insertError3) {
-                    console.error("AGAIN Error inserting carwash:", insertError3);
+                    console.error("AGAIN Error inserting cardetailer:", insertError3);
                   } 
                 }
               }
