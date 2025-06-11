@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { toSlug } from "@/libs/utils";
 import { camelToTitleCase } from "@/libs/utils";
 
 export async function GET(): Promise<NextResponse> {
@@ -12,7 +11,7 @@ export async function GET(): Promise<NextResponse> {
 
   const { data: countries, error: countryError } = await supabase
     .from("countries")
-    .select("id, name, cities(id, name)").eq("id", 23);
+    .select("id, name, cities(id, name)").eq("id", 24);
 
   if (countryError) {
     console.error("Error fetching country data:", countryError);
@@ -22,13 +21,12 @@ export async function GET(): Promise<NextResponse> {
   for (const country of countries) {
     const cities = country.cities;
     for (const city of cities) {
-      const textQuery = `Massage in ${city.name}, ${country.name}`;
+      const textQuery = `Lead generation company in ${city.name}, ${country.name}`;
       const body = JSON.stringify({
         textQuery,
         languageCode,
         rankPreference: "RELEVANCE",
-        minRating: 3.0,
-        pageSize: 18,
+        pageSize: 20,
       });
 
       try {
@@ -66,22 +64,14 @@ export async function GET(): Promise<NextResponse> {
               const formattedPlace = {
                 id: place.id,
                 name: place.displayName.text,
-                slug: toSlug(place.displayName.text),
                 international_phone_number: place.internationalPhoneNumber,
                 address: place.formattedAddress,
                 opening_hours: place.currentOpeningHours?.weekdayDescriptions,
                 rating: place.rating,
-                restroom: place.restroom,
-                wheelchair_accessible_parking: place.accessibilityOptions?.wheelchairAccessibleParking,
-                wheelchair_accessible_restroom: place.accessibilityOptions?.wheelchairAccessibleRestroom,
-                wheelchair_accessible_entrance: place.accessibilityOptions?.wheelchairAccessibleEntrance,
                 google_maps_uri: place.googleMapsUri,
                 reviews: place.reviews,
-                longitude: place.location?.longitude,
-                latitude: place.location?.latitude,
                 user_rating_count: place.userRatingCount,
                 website_uri: place.websiteUri,
-                good_for_children: place.goodForChildren,
                 description: place.generativeSummary?.overview?.text,
                 services: place.types.filter((type: string) => type !== "point_of_interest" && type !== "establishment"),
                 payment_options: paymentOptionsArray,
@@ -89,28 +79,13 @@ export async function GET(): Promise<NextResponse> {
                 country_id: country.id,
               };
 
-              if (!formattedPlace.slug || formattedPlace.slug === "") {
-                continue;
-              }
-
               const { error: insertError } = await supabase
-                .from("massages_parlors")
+                .from("leads")
                 .insert(formattedPlace)
                 .select();
 
               if (insertError) {
-                console.error("Error inserting massage parlor:", insertError);
-                if (insertError.details && insertError.details.includes("(slug)=")) {
-                  formattedPlace.name = `${formattedPlace.name} - ${city.name}`;
-                  formattedPlace.slug = toSlug(`${formattedPlace.name}-${city.name}`);
-                  const { error: insertError3 } = await supabase
-                    .from("massages_parlors")
-                    .insert(formattedPlace);
-
-                  if (insertError3) {
-                    console.error("AGAIN Error inserting massage parlor:", insertError3);
-                  } 
-                }
+                console.error("Error inserting lead company:", insertError);
               }
 
             }

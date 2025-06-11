@@ -12,7 +12,7 @@ export async function GET(): Promise<NextResponse> {
 
   const { data: countries, error: countryError } = await supabase
     .from("countries")
-    .select("id, name, cities(id, name)").eq("id", 23);
+    .select("id, name, cities(id, name)").eq("id", 1);
 
   if (countryError) {
     console.error("Error fetching country data:", countryError);
@@ -22,13 +22,14 @@ export async function GET(): Promise<NextResponse> {
   for (const country of countries) {
     const cities = country.cities;
     for (const city of cities) {
-      const textQuery = `Massage in ${city.name}, ${country.name}`;
+      const textQuery = `obesity medicine doctor in ${city.name}, ${country.name}`;
       const body = JSON.stringify({
         textQuery,
         languageCode,
+        includedType: "doctor",
         rankPreference: "RELEVANCE",
         minRating: 3.0,
-        pageSize: 18,
+        pageSize: 20,
       });
 
       try {
@@ -48,7 +49,7 @@ export async function GET(): Promise<NextResponse> {
           return NextResponse.json({ status: response.status, error: errorData });
         }
 
-        const newPlaces = await response.json();          
+        const newPlaces = await response.json();            
 
         if (newPlaces.places) {
           for (const place of newPlaces.places) {
@@ -94,21 +95,21 @@ export async function GET(): Promise<NextResponse> {
               }
 
               const { error: insertError } = await supabase
-                .from("massages_parlors")
+                .from("obesity_medecine_practice")
                 .insert(formattedPlace)
                 .select();
 
               if (insertError) {
-                console.error("Error inserting massage parlor:", insertError);
+                console.error("Error inserting obesity_medecine_practice clinic:", insertError);
                 if (insertError.details && insertError.details.includes("(slug)=")) {
                   formattedPlace.name = `${formattedPlace.name} - ${city.name}`;
                   formattedPlace.slug = toSlug(`${formattedPlace.name}-${city.name}`);
                   const { error: insertError3 } = await supabase
-                    .from("massages_parlors")
+                    .from("obesity_medecine_practice")
                     .insert(formattedPlace);
 
                   if (insertError3) {
-                    console.error("AGAIN Error inserting massage parlor:", insertError3);
+                    console.error("AGAIN Error inserting obesity_medecine_practice:", insertError3);
                   } 
                 }
               }

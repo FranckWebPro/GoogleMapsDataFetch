@@ -12,7 +12,7 @@ export async function GET(): Promise<NextResponse> {
 
   const { data: countries, error: countryError } = await supabase
     .from("countries")
-    .select("id, name, cities(id, name)").eq("id", 1);
+    .select("id, name, cities(id, name)").eq("id", 23);
 
   if (countryError) {
     console.error("Error fetching country data:", countryError);
