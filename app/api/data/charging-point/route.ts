@@ -12,7 +12,8 @@ export async function GET(): Promise<NextResponse> {
 
   const { data: countries, error: countryError } = await supabase
     .from("countries")
-    .select("id, name, cities(id, name)").eq("id", 24);
+    .select("id, name, cities(id, name, charging_points(id))")
+    .eq("id", 1);
 
   if (countryError) {
     console.error("Error fetching country data:", countryError);
@@ -21,14 +22,15 @@ export async function GET(): Promise<NextResponse> {
 
   for (const country of countries) {
     const cities = country.cities;
+
     for (const city of cities) {
-      const textQuery = `egg donation clinic in ${city.name}, ${country.name}`;
+      const textQuery = `ev charging station in ${city.name}, ${country.name}`;
       const body = JSON.stringify({
         textQuery,
         languageCode,
-        
+        includedType: "electric_vehicle_charging_station",
         rankPreference: "RELEVANCE",
-        minRating: 3.0,
+        minRating: 2.5,
         pageSize: 20,
       });
 
@@ -49,8 +51,8 @@ export async function GET(): Promise<NextResponse> {
           return NextResponse.json({ status: response.status, error: errorData });
         }
 
-        const newPlaces = await response.json();            
-
+        const newPlaces = await response.json();  
+        
         if (newPlaces.places) {
           for (const place of newPlaces.places) {
             if (place.id && place.displayName?.text) {
@@ -64,7 +66,7 @@ export async function GET(): Promise<NextResponse> {
         }
 
         }
-              const newCategorySlug = "egg-donation";
+              const newCategorySlug = "ev-charging-station";
 
               const formattedPlace = {
                 id: place.id,
@@ -84,8 +86,9 @@ export async function GET(): Promise<NextResponse> {
                 latitude: place.location?.latitude,
                 user_rating_count: place.userRatingCount,
                 website_uri: place.websiteUri,
-                good_for_children: place.goodForChildren,
                 description: place.generativeSummary?.overview?.text,
+                fuel_options: place.fuelOptions,
+                charge_options: place.chargeOptions,
                 services: place.types.filter((type: string) => type !== "point_of_interest" && type !== "establishment"),
                 payment_options: paymentOptionsArray,
                 city_id: city.id,
@@ -97,51 +100,56 @@ export async function GET(): Promise<NextResponse> {
                 continue;
               }
 
-              // Check if clinic already exists
-              const { data: existingClinic, error: fetchClinicError } = await supabase
-                .from("clinics")
+              // Check if charging point already exists
+              const { data: existingPoint, error: fetchPointError } = await supabase
+                .from("charging_points")
                 .select("categories")
                 .eq("id", formattedPlace.id)
                 .maybeSingle();
 
-              if (fetchClinicError) {
-                console.error("Error checking existing clinic:", fetchClinicError);
+              if (fetchPointError) {
+                console.error("Error checking existing charging_points:", fetchPointError);
               }
 
-              if (existingClinic) {
-                const currentCategories: string[] = existingClinic.categories ?? [];
+              if (existingPoint) {
+                const currentCategories: string[] = existingPoint.categories ?? [];
                 if (!currentCategories.includes(newCategorySlug)) {
                   const { error: updateError } = await supabase
-                    .from("clinics")
+                    .from("charging_points")
                     .update({ categories: [...currentCategories, newCategorySlug] })
                     .eq("id", formattedPlace.id);
 
                   if (updateError) {
-                    console.error("Error updating categories for existing clinic:", updateError);
+                    console.error("Error updating categories for existing charging_points:", updateError);
                   }
                 }
                 continue;
               }
 
-              const { error: insertError } = await supabase
-                .from("clinics")
-                .insert(formattedPlace)
-                .select();
+              const baseName = `${place.displayName.text} - ${city.name}`;
+              let attempt = 0;
+              let insertError: any;
 
-              if (insertError) {
-                console.error("Error inserting fertility_clinics clinic:", insertError);
-                if (insertError.details && insertError.details.includes("(slug)=")) {
-                  formattedPlace.name = `${formattedPlace.name} - ${city.name}`;
-                  formattedPlace.slug = toSlug(`${formattedPlace.name}-${city.name}`);
-                  const { error: insertError3 } = await supabase
-                    .from("clinics")
-                    .insert(formattedPlace);
+              // Start with the base name/slug (no suffix), then append a number
+              // that increments on every duplicate-slug error (base-name-1, 2 …).
+              formattedPlace.slug = toSlug(baseName);
 
-                  if (insertError3) {
-                    console.error("AGAIN Error inserting clinics:", insertError3);
-                  } 
+              do {
+                const { error } = await supabase
+                  .from("charging_points")
+                  .insert(formattedPlace)
+                  .select();
+
+                insertError = error;
+
+                if (insertError && insertError.details?.includes("(slug)=")) {
+                  attempt += 1;
+                  formattedPlace.name = `${baseName}-${attempt}`;
+                  formattedPlace.slug = toSlug(formattedPlace.name);
+                } else if (insertError) {
+                  console.error("Error inserting charging_points:", insertError);
                 }
-              }
+              } while (insertError && insertError.details?.includes("(slug)="));
 
             }
           }
